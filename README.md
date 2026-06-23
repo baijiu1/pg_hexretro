@@ -15,6 +15,39 @@ In PostgreSQL, when a row is `DELETED` or `UPDATED`, the storage engine utilizes
 
 `pg_hexretro` serves as a digital forensics scanner that reads these raw bytes, interprets the internal layout of standard PostgreSQL pages, and reconstructs "invisible" or deleted tuples back into human-readable data or SQL flashback statements.
 
+## How pg_hexretro
+
+graph TD
+    %% Style definitions
+    classDef input fill:#e1f5fe,stroke:#039be5,stroke-width:2px;
+    classDef process fill:#fff3e0,stroke:#ffb74d,stroke-width:2px;
+    classDef condition fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px;
+    classDef output fill:#e8f5e9,stroke:#81c784,stroke-width:2px;
+
+    %% Nodes
+    A([User CLI Input]) :::input --> B[Open Raw Relation File & Split into 8KB Blocks]:::process
+    B --> C[Loop: Read Next 8KB Page]:::process
+    
+    C --> D[Parse PageHeaderData <br/> Extract pd_lower & pd_upper]:::process
+    D --> E[Iterate ItemIdData Array <br/> Line Pointers]:::process
+    
+    E --> F{Is ItemId Valid <br/> Flags == 1 ?}:::condition
+    F -- No --> E
+    F -- Yes --> G[Calculate Tuple Physical Offset]:::process
+    
+    G --> H[Read HeapTupleHeaderData <br/> Extract t_xmin, t_xmax, t_infomask]:::process
+    H --> I{Does t_xmax == Target XMAX <br/> & COMMITTED?}:::condition
+    
+    I -- No --> E
+    I -- Yes --> J[Extract Raw Payload Bytes <br/> Decode via Null-Bitmap]:::process
+    
+    J --> K[Format Fields to Structured Data]:::process
+    K --> L[Generate Reverse DML <br/> INSERT INTO...]:::output
+    
+    L --> M{Has Reached <br/> End of File?}:::condition
+    M -- No --> C
+    M -- Yes --> N([Output Final Flashback .sql Script]):::output
+
 ---
 
 ## 📐 PostgreSQL Page Layout Deep Dive
