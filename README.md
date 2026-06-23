@@ -17,6 +17,7 @@ In PostgreSQL, when a row is `DELETED` or `UPDATED`, the storage engine utilizes
 
 ## How pg_hexretro
 
+```mermaid
 graph TD
     %% Style definitions
     classDef input fill:#e1f5fe,stroke:#039be5,stroke-width:2px;
@@ -47,6 +48,8 @@ graph TD
     L --> M{Has Reached <br/> End of File?}:::condition
     M -- No --> C
     M -- Yes --> N([Output Final Flashback .sql Script]):::output
+```
+
 
 ---
 
