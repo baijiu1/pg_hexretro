@@ -19,35 +19,41 @@ In PostgreSQL, when a row is `DELETED` or `UPDATED`, the storage engine utilizes
 
 ```mermaid
 graph TD
-    %% Style definitions
-    classDef input fill:#e1f5fe,stroke:#039be5,stroke-width:2px;
-    classDef process fill:#fff3e0,stroke:#ffb74d,stroke-width:2px;
-    classDef condition fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px;
-    classDef output fill:#e8f5e9,stroke:#81c784,stroke-width:2px;
-
-    %% Nodes
-    A([User CLI Input]) :::input --> B[Open Raw Relation File & Split into 8KB Blocks]:::process
-    B --> C[Loop: Read Next 8KB Page]:::process
+    %% 1. 节点定义与文本
+    A([User CLI Input]) --> B[Open Raw Relation File & Split into 8KB Blocks]
+    B --> C[Loop: Read Next 8KB Page]
     
-    C --> D[Parse PageHeaderData <br/> Extract pd_lower & pd_upper]:::process
-    D --> E[Iterate ItemIdData Array <br/> Line Pointers]:::process
+    C --> D[Parse PageHeaderData <br/> Extract pd_lower & pd_upper]
+    D --> E[Iterate ItemIdData Array <br/> Line Pointers]
     
-    E --> F{Is ItemId Valid <br/> Flags == 1 ?}:::condition
+    E --> F{Is ItemId Valid <br/> Flags == 1 ?}
     F -- No --> E
-    F -- Yes --> G[Calculate Tuple Physical Offset]:::process
+    F -- Yes --> G[Calculate Tuple Physical Offset]
     
-    G --> H[Read HeapTupleHeaderData <br/> Extract t_xmin, t_xmax, t_infomask]:::process
-    H --> I{Does t_xmax == Target XMAX <br/> & COMMITTED?}:::condition
+    G --> H[Read HeapTupleHeaderData <br/> Extract t_xmin, t_xmax, t_infomask]
+    H --> I{Does t_xmax == Target XMAX <br/> & COMMITTED?}
     
     I -- No --> E
-    I -- Yes --> J[Extract Raw Payload Bytes <br/> Decode via Null-Bitmap]:::process
+    I -- Yes --> J[Extract Raw Payload Bytes <br/> Decode via Null-Bitmap]
     
-    J --> K[Format Fields to Structured Data]:::process
-    K --> L[Generate Reverse DML <br/> INSERT INTO...]:::output
+    J --> K[Format Fields to Structured Data]
+    K --> L[Generate Reverse DML <br/> INSERT INTO...]
     
-    L --> M{Has Reached <br/> End of File?}:::condition
+    L --> M{Has Reached <br/> End of File?}
     M -- No --> C
-    M -- Yes --> N([Output Final Flashback .sql Script]):::output
+    M -- Yes --> N([Output Final Flashback .sql Script])
+
+    %% 2. 颜色样式定义
+    classDef inputStyle fill:#e1f5fe,stroke:#039be5,stroke-width:2px;
+    classDef processStyle fill:#fff3e0,stroke:#ffb74d,stroke-width:2px;
+    classDef conditionStyle fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px;
+    classDef outputStyle fill:#e8f5e9,stroke:#81c784,stroke-width:2px;
+
+    %% 3. 将样式强绑定到具体节点
+    class A inputStyle;
+    class B,C,D,E,G,H,J,K processStyle;
+    class F,I,M conditionStyle;
+    class L,N outputStyle;
 ```
 
 
