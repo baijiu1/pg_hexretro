@@ -2,46 +2,73 @@
 
 [中文版介绍](https://github.com/baijiu1/pg_hexretro/blob/main/README_zh.md)
 
-[pg_hexretro](https://github.com/baijiu1/pg_hexretro) is tool of transform postgrelsql data file to data. It can be parse data files. pg_hexretro written with C is commonly used to learn postgresql data file construct and data record recovery. can be parser meta data from pg_class/pg_attribute/pg_type.
+# pg_hexretro
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![PostgreSQL Version](https://img.shields.io/badge/PostgreSQL-12--16-blue.svg)](https://www.postgresql.org/)
+
+`pg_hexretro` is an advanced, low-level forensic and flashback tool designed for PostgreSQL databases. By performing raw binary analysis on PostgreSQL Heap Relation Files (the underlying table storage), it bypasses the standard SQL engine to inspect block headers, parse item pointers, decode tuple storage byte-by-byte, and facilitate data recovery/flashback for accidentally modified or deleted records.
+
+## Why pg_hexretro?
+
+In PostgreSQL, when a row is `DELETED` or `UPDATED`, the storage engine utilizes MVCC (Multi-Version Concurrency Control). Instead of immediately erasing the physical data, the row (Tuple) is marked as dead by modifying its `t_xmax` header. Before the `VACUUM` process reclaims the space, this data remains intact in the binary heap file.
+
+`pg_hexretro` serves as a digital forensics scanner that reads these raw bytes, interprets the internal layout of standard PostgreSQL pages, and reconstructs "invisible" or deleted tuples back into human-readable data or SQL flashback statements.
+
+---
+
+## 📐 PostgreSQL Page Layout Deep Dive
+
+To understand how `pg_hexretro` reconstructs data, here is the physical layout of a standard 8KB PostgreSQL page that this tool decodes sequentially:
+
+```text
++-----------------------------------------------------------------------+
+| PageHeaderData (24 Bytes)                                             |
+| (Contains LSN, flags, pd_lower, pd_upper, pd_special, etc.)           |
++-----------------------------------------------------------------------+
+| ItemIdData[0] (Linp1) | ItemIdData[1] (Linp2) | ItemIdData[2] (Linp3) |
+| (4 Bytes each, line pointers mapping to actual tuple offsets)        |
++-----------------------------------------------------------------------+
+| ......................... pd_lower .................................. |
+|                         (Free Space)                                  |
+| ......................... pd_upper .................................. |
++-----------------------------------------------------------------------+
+|                                               | Tuple 3 (Raw Storage) |
++-----------------------------------------------+-----------------------+
+|                       | Tuple 2 (Raw Storage)                         |
++-----------------------+-----------------------------------------------+
+| Tuple 1 (Raw Storage)                                                 |
+| (Contains HeapTupleHeaderData: t_xmin, t_xmax, t_cid, t_infomask...)  |
++-----------------------------------------------------------------------+
+| pd_special (Optional, used in index pages)                            |
++-----------------------------------------------------------------------+
+```
+
+pg_hexretro reads pd_lower and pd_upper offsets, extracts valid/dead line pointers (ItemIdData), and then jumps directly to the high-address space to carve out the HeapTupleHeaderData and actual payload bytes.
 
 
+# Core Features
+*Offline Binary Parsing*: Safely scans raw PG table files (e.g., 16384, 16384.1) completely offline without requiring an active PostgreSQL instance or locking shared buffers.
 
-# FEATURE
+*MVCC Introspection*: Inspects internal header fields (t_xmin, t_xmax, t_cid, t_infomask, t_infomask2) to determine the exact transaction status and visibility of each tuple.
 
-~~Simple and useful !~~
+*Flashback Generation*: Automatically maps dead tuples back into reverse DML statements (INSERT statements to recover deleted rows).
 
-Security: as long as the file has **read** permission.
-
-Comprehensiveness: **all** column types in postgresql 9.x 10.x 11.x 12.x 13.x 14.x 15.x 16.x 17.x 18.x, opengauss3.x 5.x 6.x. support all column types for parser.
-
-Simple: compile execute file and do it without third-party dependencies.
-
-Useful: parse data with mark of deleted.
+*Hex & Text Dual Inspection*: Provides low-level hex alignment views coupled with structural field mapping for quick debugging of corrupted database pages.
 
 
+# Quick Start
+Prerequisites
+Supported PG Versions: PostgreSQL 12, 13, 14, 15, and 16.
 
+Compilation Environment: [Go 1.20+ / C99]
 
-
-
-
-# USAGE
-
-
-## compile
-
-**Linux/MacOS**
 
 ```shell
 cmake .
 make
 cd bin/
-```
 
-## usage
-
-**Linux/MacOS**
-
-```shell
 SHELL> ./pg_hexretro 
 Version 1.1 (for PostgreSQL 8.x .. 17.x opengauss 3.x .. 5.x)
 Display formatted contents of a PostgreSQL heap fileUsage:
@@ -110,13 +137,6 @@ INSERT INTO mixed_data_table("id", "name", "age", "created_at", "description", "
 | v0.2    | 2026.5.21  | support all column types                 |
 
 
-
-
-# REQUIRE & SUPPORT
-
-require: gcc
-
-support range: postgresql/opengauss
 
 # CONTACT ME
 
